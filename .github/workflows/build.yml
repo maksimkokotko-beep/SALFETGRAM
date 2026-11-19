@@ -1,0 +1,115 @@
+name: Build SalfetGram APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 330
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.1" "ndk;21.4.7075529" "cmake;3.10.2.4899665"
+          if [ ! -d "$ANDROID_HOME/cmake/3.10.2" ]; then
+            ln -s "$ANDROID_HOME/cmake/3.10.2.4899665" "$ANDROID_HOME/cmake/3.10.2" || true
+          fi
+
+      - name: Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', 'gradle.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Generate signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore TMessagesProj/config/extera.jks \
+            -storepass salfetgram -keypass salfetgram \
+            -alias salfetgram -keyalg RSA -keysize 2048 -validity 10950 \
+            -dname "CN=SalfetGram, OU=SalfetGram, O=SalfetGram, L=Moscow, ST=Moscow, C=RU"
+
+      - name: Write API_KEYS
+        run: |
+          cat > API_KEYS <<'EOF'
+          APP_ID=4
+          APP_HASH=014b35b6184100b085b0d0572f9b5103
+          MAPS_V2_API=
+          SIGNING_KEY_STORE_PASSWORD=salfetgram
+          SIGNING_KEY_ALIAS=salfetgram
+          SIGNING_KEY_PASSWORD=salfetgram
+          EOF
+
+      - name: Write google-services.json
+        run: |
+          cat > TMessagesProj/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "123456789012",
+              "project_id": "salfetgram",
+              "storage_bucket": "salfetgram.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:123456789012:android:0000000000000000000000",
+                  "android_client_info": {
+                    "package_name": "com.salfetgram.messenger"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "AIzaSyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+
+      - name: Build arm64 release
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleArm64Release --no-daemon --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx6g -Dfile.encoding=UTF-8"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SalfetGram-arm64
+          path: TMessagesProj/build/outputs/apk/**/*.apk
+          if-no-files-found: error
