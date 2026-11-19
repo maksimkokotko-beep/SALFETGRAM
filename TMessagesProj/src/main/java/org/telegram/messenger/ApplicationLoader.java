@@ -79,8 +79,10 @@ public class ApplicationLoader extends Application {
 
     @Override
     protected void attachBaseContext(Context base) {
+        CrashLogWriter.log(base, "attachBaseContext");
         super.attachBaseContext(base);
         MultiDex.install(this);
+        CrashLogWriter.log("attachBaseContext done");
     }
 
     public static ILocationServiceProvider getLocationServiceProvider() {
@@ -233,6 +235,7 @@ public class ApplicationLoader extends Application {
 
     @Override
     public void onCreate() {
+        CrashLogWriter.log(this, "ApplicationLoader.onCreate");
         applicationLoaderInstance = this;
         try {
             applicationContext = getApplicationContext();
@@ -250,10 +253,19 @@ public class ApplicationLoader extends Application {
             applicationContext = getApplicationContext();
         }
 
-        NativeLoader.initNativeLibs(ApplicationLoader.applicationContext);
+        CrashLogWriter.log("loading native libs");
+        try {
+            NativeLoader.initNativeLibs(ApplicationLoader.applicationContext);
+            CrashLogWriter.log("native libs loaded: " + NativeLoader.getAbiFolder());
+        } catch (Throwable t) {
+            CrashLogWriter.report(t, "NativeLoader.initNativeLibs");
+            throw new RuntimeException(t);
+        }
         try {
             ConnectionsManager.native_setJava(false);
+            CrashLogWriter.log("native_setJava ok");
         } catch (UnsatisfiedLinkError error) {
+            CrashLogWriter.report(error, "native_setJava");
             throw new RuntimeException("can't load native libraries " +  Build.CPU_ABI + " lookup folder " + NativeLoader.getAbiFolder());
         }
         new ForegroundDetector(this) {
@@ -297,6 +309,7 @@ public class ApplicationLoader extends Application {
 
         ApplicationLoader app = (ApplicationLoader) ApplicationLoader.applicationContext;
         app.initFirebase();
+        CrashLogWriter.log("ApplicationLoader.onCreate complete");
     }
 
     // SALFETGRAM: writes the crash trace next to the APK so it can be read without adb
