@@ -12,8 +12,8 @@
 -->
 
 <resources>
-    <string name="exteraAppName" translatable="false">exteraGram</string>
-    <string name="Preferences">exteraGram Preferences</string>
+    <string name="exteraAppName" translatable="false">SalfetGram</string>
+    <string name="Preferences">SalfetGram Preferences</string>
 
     <!-- Main Menu -->
     <string name="Links">Links</string>
