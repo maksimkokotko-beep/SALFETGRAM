@@ -1051,6 +1051,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     }
 
     private void needShowAlert(String title, String text) {
+        org.telegram.messenger.CrashLogWriter.log("login alert: [" + title + "] " + text);
         if (text == null || getParentActivity() == null) {
             return;
         }
@@ -1276,6 +1277,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     }
 
     private void onDoneButtonPressed() {
+        org.telegram.messenger.CrashLogWriter.log("done pressed: visible=" + doneButtonVisible[currentDoneType]
+                + " loading=" + (radialProgressView.getTag() != null)
+                + " page=" + currentViewNum + " doneType=" + currentDoneType);
         if (!doneButtonVisible[currentDoneType]) {
             return;
         }
@@ -2623,6 +2627,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
         @Override
         public void onNextPressed(String code) {
+            org.telegram.messenger.CrashLogWriter.log("phoneView.next: codeLen=" + codeField.length()
+                    + " phoneLen=" + phoneField.length() + " nextPressed=" + nextPressed
+                    + " firebaseSms=" + isRequestingFirebaseSms + " confirmed=" + confirmedNumber
+                    + " mode=" + activityMode + " parent=" + (getParentActivity() != null));
             if (getParentActivity() == null || nextPressed || isRequestingFirebaseSms) {
                 return;
             }
@@ -2950,6 +2958,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             phoneInputData.patterns = phoneFormatMap.get(codeField.getText().toString());
             int reqId = ConnectionsManager.getInstance(currentAccount).sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
                 nextPressed = false;
+                org.telegram.messenger.CrashLogWriter.log("sendCode: " + (error == null
+                        ? ("ok " + (response == null ? "null" : response.getClass().getSimpleName()))
+                        : ("error " + error.code + " " + error.text)));
                 if (error == null) {
                     if (response instanceof TLRPC.TL_auth_sentCodeSuccess) {
                         TLRPC.auth_Authorization auth = ((TLRPC.TL_auth_sentCodeSuccess) response).authorization;
