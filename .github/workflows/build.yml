@@ -118,11 +118,6 @@ jobs:
           }
           EOF
 
-      - name: Disable R8 (diagnostic build)
-        run: |
-          sed -i "s/minifyEnabled true/minifyEnabled false/g; s/shrinkResources true/shrinkResources false/g" TMessagesProj/build.gradle
-          grep -n "minifyEnabled\|shrinkResources" TMessagesProj/build.gradle
-
       - name: Build arm64 release
         run: |
           chmod +x gradlew
