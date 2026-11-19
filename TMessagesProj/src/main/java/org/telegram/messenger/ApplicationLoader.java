@@ -270,7 +270,7 @@ public class ApplicationLoader extends Application {
             FileLog.d("load libs time = " + (SystemClock.elapsedRealtime() - startTime));
         }
 
-        if (BuildVars.DEBUG_VERSION) {
+        if (true) { // SALFETGRAM: always copy crash to clipboard
             var oldDefaultUncaughtExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();
             Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
                 try {
