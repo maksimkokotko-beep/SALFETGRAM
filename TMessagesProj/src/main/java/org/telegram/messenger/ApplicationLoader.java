@@ -270,9 +270,10 @@ public class ApplicationLoader extends Application {
             FileLog.d("load libs time = " + (SystemClock.elapsedRealtime() - startTime));
         }
 
-        if (true) { // SALFETGRAM: always copy crash to clipboard
+        if (true) { // SALFETGRAM: always save crash log
             var oldDefaultUncaughtExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();
             Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+                saveCrashToStorage(e);
                 try {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) ApplicationLoader.applicationContext.getSystemService(Context.CLIPBOARD_SERVICE);
                     android.content.ClipData clip = android.content.ClipData.newPlainText("label", Log.getStackTraceString(e));
@@ -296,6 +297,42 @@ public class ApplicationLoader extends Application {
 
         ApplicationLoader app = (ApplicationLoader) ApplicationLoader.applicationContext;
         app.initFirebase();
+    }
+
+    // SALFETGRAM: writes the crash trace next to the APK so it can be read without adb
+    public static void saveCrashToStorage(Throwable e) {
+        final String trace = android.util.Log.getStackTraceString(e);
+        final Context ctx = applicationContext;
+        if (ctx == null) return;
+        // 1) public folder: Download/SalfetGram/crash-*.txt
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                android.content.ContentValues cv = new android.content.ContentValues();
+                String name = "crash-" + new java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(new java.util.Date()) + ".txt";
+                cv.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name);
+                cv.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "text/plain");
+                cv.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, "Download/SalfetGram");
+                android.net.Uri uri = ctx.getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
+                if (uri != null) {
+                    java.io.OutputStream os = ctx.getContentResolver().openOutputStream(uri);
+                    if (os != null) {
+                        os.write(trace.getBytes("UTF-8"));
+                        os.flush();
+                        os.close();
+                    }
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        // 2) app private folder
+        try {
+            java.io.File dir = new java.io.File(ctx.getExternalFilesDir(null), "logs");
+            dir.mkdirs();
+            java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "crash-last.txt"), false);
+            fw.write(trace);
+            fw.close();
+        } catch (Throwable ignore) {
+        }
     }
 
     public static void startPushService() {
