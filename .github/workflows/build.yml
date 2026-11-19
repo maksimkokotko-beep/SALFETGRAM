@@ -54,6 +54,7 @@ jobs:
 
       - name: Generate signing key
         run: |
+          rm -f TMessagesProj/config/extera.jks
           keytool -genkeypair -v \
             -keystore TMessagesProj/config/extera.jks \
             -storepass salfetgram -keypass salfetgram \
