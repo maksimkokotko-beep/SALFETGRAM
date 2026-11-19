@@ -2,6 +2,15 @@ name: Build SalfetGram APK
 
 on:
   workflow_dispatch:
+    inputs:
+      app_id:
+        description: 'Telegram api_id (с my.telegram.org)'
+        required: false
+        default: '4'
+      app_hash:
+        description: 'Telegram api_hash'
+        required: false
+        default: '014b35b6184100b085b0d0572f9b5103'
   push:
     branches: [ main ]
     paths-ignore:
@@ -62,15 +71,18 @@ jobs:
             -dname "CN=SalfetGram, OU=SalfetGram, O=SalfetGram, L=Moscow, ST=Moscow, C=RU"
 
       - name: Write API_KEYS
+        env:
+          APP_ID_IN: ${{ inputs.app_id || '4' }}
+          APP_HASH_IN: ${{ inputs.app_hash || '014b35b6184100b085b0d0572f9b5103' }}
         run: |
-          cat > API_KEYS <<'EOF'
-          APP_ID=4
-          APP_HASH=014b35b6184100b085b0d0572f9b5103
-          MAPS_V2_API=
-          SIGNING_KEY_STORE_PASSWORD=salfetgram
-          SIGNING_KEY_ALIAS=salfetgram
-          SIGNING_KEY_PASSWORD=salfetgram
-          EOF
+          {
+            echo "APP_ID=$APP_ID_IN"
+            echo "APP_HASH=\"$APP_HASH_IN\""
+            echo "MAPS_V2_API="
+            echo "SIGNING_KEY_STORE_PASSWORD=salfetgram"
+            echo "SIGNING_KEY_ALIAS=salfetgram"
+            echo "SIGNING_KEY_PASSWORD=salfetgram"
+          } > API_KEYS
 
       - name: Write google-services.json
         run: |
