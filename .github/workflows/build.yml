@@ -27,13 +27,17 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install SDK packages
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.1" "ndk;21.4.7075529" "cmake;3.10.2.4899665"
+          echo "SDK at $ANDROID_HOME"
+          SDKM=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)
+          echo "using $SDKM"
+          yes | "$SDKM" --licenses > /dev/null 2>&1 || true
+          "$SDKM" --install "platform-tools" "platforms;android-33" "build-tools;33.0.1" "ndk;21.4.7075529" "cmake;3.10.2.4899665" 2>&1 | tail -5
+          ls "$ANDROID_HOME/ndk" "$ANDROID_HOME/cmake"
           if [ ! -d "$ANDROID_HOME/cmake/3.10.2" ]; then
             ln -s "$ANDROID_HOME/cmake/3.10.2.4899665" "$ANDROID_HOME/cmake/3.10.2" || true
           fi
