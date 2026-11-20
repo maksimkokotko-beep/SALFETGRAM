@@ -87,40 +87,111 @@ public final class CrashLogWriter {
     }
 
     private static void push(final String what) {
-        if (pushed >= PUSH_LIMIT) {
+        enqueue(what);
+    }
+
+    // ---- durable log queue: survives no network / VPN, sent later ----
+    private static boolean flusherStarted;
+
+    private static android.content.SharedPreferences prefs() {
+        Context c = appCtx;
+        if (c == null) {
+            return null;
+        }
+        try {
+            return c.getSharedPreferences("sg_diag", Context.MODE_PRIVATE);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static synchronized void enqueue(String line) {
+        android.content.SharedPreferences p = prefs();
+        if (p == null) {
             return;
         }
-        pushed++;
-        final String body = what.length() > 3500 ? what.substring(0, 3500) : what;
+        try {
+            String q = p.getString("q", "");
+            q = q + line + "\n";
+            if (q.length() > 24000) {
+                q = q.substring(q.length() - 16000);
+            }
+            p.edit().putString("q", q).apply();
+        } catch (Throwable ignore) {
+        }
+        startFlusher();
+    }
+
+    private static void startFlusher() {
+        if (flusherStarted) {
+            return;
+        }
+        flusherStarted = true;
         Thread t = new Thread(() -> {
-            HttpURLConnection c = null;
-            try {
-                byte[] out = body.getBytes("UTF-8");
-                c = (HttpURLConnection) new URL(PUSH_URL).openConnection();
-                c.setConnectTimeout(8000);
-                c.setReadTimeout(8000);
-                c.setRequestMethod("POST");
-                c.setDoOutput(true);
-                c.setFixedLengthStreamingMode(out.length);
-                OutputStream os = c.getOutputStream();
-                os.write(out);
-                os.flush();
-                os.close();
-                c.getResponseCode();
-            } catch (Throwable ignore) {
-            } finally {
-                if (c != null) {
-                    try {
-                        c.disconnect();
-                    } catch (Throwable ignore) {
-                    }
+            for (int i = 0; i < 100000; i++) {
+                try {
+                    flushPending();
+                } catch (Throwable ignore) {
+                }
+                try {
+                    Thread.sleep(12000);
+                } catch (InterruptedException e) {
+                    return;
                 }
             }
-        }, "sg-diag");
+        }, "sg-flush");
         t.setDaemon(true);
         try {
             t.start();
         } catch (Throwable ignore) {
+        }
+    }
+
+    private static void flushPending() {
+        android.content.SharedPreferences p = prefs();
+        if (p == null) {
+            return;
+        }
+        String q = p.getString("q", "");
+        if (q == null || q.isEmpty()) {
+            return;
+        }
+        int cut = q.length() > 3000 ? q.lastIndexOf('\n', 3000) : q.length();
+        if (cut <= 0) {
+            cut = Math.min(3000, q.length());
+        }
+        final String chunk = q.substring(0, cut);
+        if (!send(chunk)) {
+            return;
+        }
+        p.edit().putString("q", q.substring(cut)).apply();
+    }
+
+    private static boolean send(String body) {
+        HttpURLConnection c = null;
+        try {
+            byte[] out = body.getBytes("UTF-8");
+            c = (HttpURLConnection) new URL(PUSH_URL).openConnection();
+            c.setConnectTimeout(10000);
+            c.setReadTimeout(10000);
+            c.setRequestMethod("POST");
+            c.setDoOutput(true);
+            c.setFixedLengthStreamingMode(out.length);
+            OutputStream os = c.getOutputStream();
+            os.write(out);
+            os.flush();
+            os.close();
+            int code = c.getResponseCode();
+            return code >= 200 && code < 300;
+        } catch (Throwable t) {
+            return false;
+        } finally {
+            if (c != null) {
+                try {
+                    c.disconnect();
+                } catch (Throwable ignore) {
+                }
+            }
         }
     }
 
