@@ -2675,7 +2675,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             org.telegram.messenger.CrashLogWriter.log("phoneView.next: codeLen=" + codeField.length()
                     + " phoneLen=" + phoneField.length() + " nextPressed=" + nextPressed
                     + " firebaseSms=" + isRequestingFirebaseSms + " confirmed=" + confirmedNumber
-                    + " mode=" + activityMode + " parent=" + (getParentActivity() != null));
+                    + " mode=" + activityMode + " parent=" + (getParentActivity() != null)
+                    + " appId=" + BuildVars.APP_ID);
             if (getParentActivity() == null || nextPressed || isRequestingFirebaseSms) {
                 return;
             }
@@ -8338,7 +8339,14 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     @Override
     public void didReceivedNotification(int id, int account, Object... args) {
         if (id == NotificationCenter.didUpdateConnectionState) {
+            int st = ConnectionsManager.getInstance(currentAccount).getConnectionState();
+            if (st != lastDiagState) {
+                lastDiagState = st;
+                org.telegram.messenger.CrashLogWriter.log("DIAG conn state=" + st + " (2=connecting 3=connected 1=waiting 4=updating 5=unknown?) appId=" + BuildVars.APP_ID);
+            }
             updateProxyButton(true, false);
         }
     }
+
+    private int lastDiagState = -1;
 }
