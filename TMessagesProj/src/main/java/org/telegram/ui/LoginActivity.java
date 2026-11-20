@@ -451,6 +451,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
+        org.telegram.messenger.CrashLogWriter.setUi(null);
+        diagView = null;
         for (int a = 0; a < views.length; a++) {
             if (views[a] != null) {
                 views[a].onDestroyActivity();
@@ -755,6 +757,32 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             fillNextCodeParams(cancelDeletionParams, cancelDeletionCode, false);
         }
 
+        // SALFETGRAM: diagnostic overlay - always visible log of the last events.
+        try {
+            TextView dv = new TextView(context);
+            dv.setTextSize(8);
+            dv.setTypeface(android.graphics.Typeface.MONOSPACE);
+            dv.setTextColor(0xFFFFEB3B);
+            dv.setBackgroundColor(0xB3000000);
+            dv.setPadding(AndroidUtilities.dp(6), AndroidUtilities.dp(2), AndroidUtilities.dp(6), AndroidUtilities.dp(2));
+            dv.setMaxLines(6);
+            dv.setClickable(true);
+            dv.setOnClickListener(v -> {
+                try {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager) ApplicationLoader.applicationContext.getSystemService(Context.CLIPBOARD_SERVICE);
+                    if (cm != null && diagView != null) {
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("diag", diagView.getText()));
+                        android.widget.Toast.makeText(context, "diag copied", android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                } catch (Throwable ignore) {
+                }
+            });
+            diagView = dv;
+            sizeNotifierFrameLayout.addView(dv, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT));
+            org.telegram.messenger.CrashLogWriter.setUi(dv);
+        } catch (Throwable ignore) {
+        }
+
         return fragmentView;
     }
 
@@ -1047,6 +1075,23 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         LoginActivityRegisterView registerView = (LoginActivityRegisterView) views[VIEW_REGISTER];
         if (registerView != null) {
             registerView.imageUpdater.onActivityResult(requestCode, resultCode, data);
+        }
+    }
+
+    private android.widget.TextView diagView;
+
+    private void diag(String msg) {
+        org.telegram.messenger.CrashLogWriter.log("DIAG " + msg);
+        try {
+            if (getParentActivity() == null) {
+                return;
+            }
+            AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+            builder.setTitle("SalfetGram diag");
+            builder.setMessage(msg);
+            builder.setPositiveButton(LocaleController.getString("OK", R.string.OK), null);
+            showDialog(builder.create());
+        } catch (Throwable ignore) {
         }
     }
 
@@ -2651,6 +2696,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     return;
                 }
 
+                org.telegram.messenger.CrashLogWriter.log("DIAG phone confirm view for " + phoneNumber);
                 phoneNumberConfirmView = new PhoneNumberConfirmView(fragmentView.getContext(), (ViewGroup) fragmentView, floatingButtonContainer, phoneNumber, new PhoneNumberConfirmView.IConfirmDialogCallback() {
                     @Override
                     public void onFabPressed(PhoneNumberConfirmView confirmView, TransformableLoginButtonView fab) {
@@ -2977,6 +3023,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                         fillNextCodeParams(params, (TLRPC.auth_SentCode) response);
                     }
                 } else {
+                    diag("sendCode error: code=" + error.code + " text=" + error.text);
                     if (error.text != null) {
                         if (error.text.contains("SESSION_PASSWORD_NEEDED")) {
                             TLRPC.TL_account_getPassword req2 = new TLRPC.TL_account_getPassword();
@@ -3025,6 +3072,12 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 }
             }), ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin | ConnectionsManager.RequestFlagTryDifferentDc | ConnectionsManager.RequestFlagEnableUnauthorized);
             needShowProgress(reqId);
+            final int diagReqId = reqId;
+            AndroidUtilities.runOnUIThread(() -> {
+                if (nextPressed) {
+                    diag("no answer from server in 15s (req " + diagReqId + ")");
+                }
+            }, 15000);
         }
 
         private boolean numberFilled;
