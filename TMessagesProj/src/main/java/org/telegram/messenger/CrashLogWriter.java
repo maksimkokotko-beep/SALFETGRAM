@@ -274,7 +274,6 @@ public final class CrashLogWriter {
         });
         log("handler installed, pid=" + android.os.Process.myPid()
                 + " device=" + Build.MANUFACTURER + " " + Build.MODEL + " sdk=" + Build.VERSION.SDK_INT
-                + " pkg=" + (appCtx != null ? appCtx.getPackageName() : "?")
-                + " appId=" + BuildVars.APP_ID);
+                + " pkg=" + (appCtx != null ? appCtx.getPackageName() : "?"));
     }
 }
